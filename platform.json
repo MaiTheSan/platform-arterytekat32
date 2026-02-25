@@ -33,7 +33,7 @@
         },
         "framework-at32firmlib": {
             "type": "framework",
-            "version": "https://github.com/ArteryTek/framework-at32firmlib.git"
+            "version": "https://github.com/MaiTheSan/framework-at32firmlib.git"
         },
         "tool-openocd-at32": {
             "type": "uploader",
