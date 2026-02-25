@@ -1,5 +1,5 @@
 import sys
-from os.path import exists,isdir, isfile, join
+from os.path import exists, isdir, isfile, join
 from string import Template
 
 from SCons.Script import DefaultEnvironment
@@ -11,32 +11,39 @@ mcu = board.get("build.mcu", "")
 product_line = board.get("build.product_line", "")
 bsp = board.get("build.bsp", "")
 
+# Tự động xác định thư mục CMSIS core dựa trên CPU
+cpu_type = board.get("build.cpu", "cortex-m4")
+cmsis_core_dir = "cm0plus" if cpu_type == "cortex-m0+" else "cm4"
+
 env.SConscript("_bare.py")
 
 FRAMEWORK_DIR = platform.get_package_dir("framework-at32firmlib")
 assert isdir(FRAMEWORK_DIR)
 
 FRAMEWORK_LIB_DIR = join(FRAMEWORK_DIR, bsp + "_Firmware_Library", "libraries")
-assert isdir(FRAMEWORK_LIB_DIR)
+assert isdir(FRAMEWORK_LIB_DIR), "Cannot find %s" % FRAMEWORK_LIB_DIR
 
 FRAMEWORK_MIDDLEWARE_DIR = join(FRAMEWORK_DIR, bsp + "_Firmware_Library", "middlewares")
 env.Append(FMD=[FRAMEWORK_MIDDLEWARE_DIR])
 
 
 def get_linker_script():
-    ldscript = join(FRAMEWORK_LIB_DIR, "cmsis", "cm4", "device_support", "startup", "gcc",
+    # Sử dụng cmsis_core_dir thay vì hardcode "cm4"
+    ldscript = join(FRAMEWORK_LIB_DIR, "cmsis", cmsis_core_dir, "device_support", "startup", "gcc",
                     "linker", product_line + "_FLASH.ld")
 
     if isfile(ldscript):
         return ldscript
 
-    sys.stderr.write("Warning! Cannot find a linker script for the required board! "+ldscript)
+    sys.stderr.write("Warning! Cannot find a linker script for the required board! "+ldscript+"\n")
+    return ""
 
 
 env.Append(
     CPPPATH=[
-        join(FRAMEWORK_LIB_DIR, "cmsis", "cm4", "core_support"),
-        join(FRAMEWORK_LIB_DIR, "cmsis", "cm4", "device_support"),
+        # Sử dụng cmsis_core_dir thay vì hardcode "cm4"
+        join(FRAMEWORK_LIB_DIR, "cmsis", cmsis_core_dir, "core_support"),
+        join(FRAMEWORK_LIB_DIR, "cmsis", cmsis_core_dir, "device_support"),
         join(FRAMEWORK_LIB_DIR, "drivers", "inc"),
         join(FRAMEWORK_LIB_DIR, "drivers", "src")
     ]
@@ -44,12 +51,7 @@ env.Append(
 
 env.Append(
     CPPDEFINES=[
-        "USE_STDPERIPH_DRIVER"
-    ]
-)
-
-env.Append(
-    CPPDEFINES=[
+        "USE_STDPERIPH_DRIVER",
         env["BUILD_TYPE"].upper()
     ]
 )
@@ -68,7 +70,8 @@ libs = []
 if board.get("build.at32firmlib.custom_system_setup", "no") == "no":
     libs.append(env.BuildLibrary(
         join("$BUILD_DIR", "cmsis"),
-        join(FRAMEWORK_LIB_DIR, "cmsis", "cm4", "device_support"),
+        # Sử dụng cmsis_core_dir thay vì hardcode "cm4"
+        join(FRAMEWORK_LIB_DIR, "cmsis", cmsis_core_dir, "device_support"),
         src_filter=[
             "+<*.c>",
             "+<startup/gcc/startup_%s.S>" % bsp.lower()
@@ -87,17 +90,14 @@ if(middlewares):
         print("Middleware %s referenced." % x)
         if isdir(join(FRAMEWORK_MIDDLEWARE_DIR, x.strip())) and exists(join(FRAMEWORK_MIDDLEWARE_DIR, x.strip())):
             if x == "i2c_application_library": 
-                env.Append(
-                    CPPPATH=[
-                        join(FRAMEWORK_MIDDLEWARE_DIR, x.strip())
-                    ]
-                )
+                env.Append(CPPPATH=[join(FRAMEWORK_MIDDLEWARE_DIR, x.strip())])
                 libs.append(env.BuildLibrary(
                     join("$BUILD_DIR", "middleware", x.strip()),
                     join(FRAMEWORK_MIDDLEWARE_DIR, x.strip()),
                     src_filter=["+<*.c>"]
                 ))
             if x == "freertos":
+                # Lưu ý: FreeRTOS ARM_CM3 có thể không tương thích tốt với M0+, bạn cần cấu hình lại nếu dùng FreeRTOS
                 env.Append(
                     CPPPATH=[
                         join(FRAMEWORK_MIDDLEWARE_DIR, x.strip(), "source", "include"),
@@ -114,11 +114,7 @@ if(middlewares):
                     ]
                 ))
             if x == "usbd_drivers":
-                env.Append(
-                    CPPPATH=[
-                        join(FRAMEWORK_MIDDLEWARE_DIR, x.strip(), "inc")
-                    ]
-                )
+                env.Append(CPPPATH=[join(FRAMEWORK_MIDDLEWARE_DIR, x.strip(), "inc")])
                 libs.append(env.BuildLibrary(
                     join("$BUILD_DIR", "middleware", x.strip()),
                     join(FRAMEWORK_MIDDLEWARE_DIR, x.strip(),"src"),

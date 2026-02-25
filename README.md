@@ -4,7 +4,7 @@
 1. Click "PlatformIO Core CLI" from VSCode PlatformIO Panel -> Quick Access -> Miscellaneous.
 2. Enter below install commands:
 ``` 
-pio pkg install -g -p https://github.com/ArteryTek/platform-arterytekat32
+pio pkg install -g -p https://github.com/MaiTheSan/platform-arterytekat32
 ```
 
 ### When you are using under Linux, before using, you need to install the udev rules for OpenOCD
